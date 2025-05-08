@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flappy Bird Klonu</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body, html {
+      height: 100%;
+      overflow: hidden;
+      background: skyblue;
+      font-family: Arial, sans-serif;
+    }
+    canvas {
+      display: block;
+      margin: 0 auto;
+      background: linear-gradient(skyblue, #87CEEB);
+    }
+    #startScreen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(to bottom right, #1e3c72, #2a5298);
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      font-size: 2rem;
+      z-index: 10;
+      text-align: center;
+    }
+    #startScreen p {
+      font-size: 1rem;
+      margin-top: 1rem;
+      opacity: 0.9;
+    }
+    #credit {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      font-size: 0.8rem;
+      color: #fff;
+      opacity: 0.6;
+    }
+    #highScoreDisplay {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      font-size: 18px;
+      color: white;
+      background: rgba(0, 0, 0, 0.4);
+      padding: 5px 10px;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div id="startScreen">
+    <div style="font-size: 2.5rem; font-weight: bold; margin-bottom: 1rem;">FLAPPY KUŞ</div>
+    <div>Başlamak için tıkla</div>
+    <p>Oynarken: Space tuşuna veya ekrana tıkla</p>
+    <div id="credit">SİDİK TARAFINDAN OLUŞTURULDU</div>
+  </div>
+  <div id="highScoreDisplay">En Yüksek Skor: 0</div>
+  <canvas id="gameCanvas" width="480" height="640"></canvas>
+  <audio id="flapSound" src="https://cdn.pixabay.com/audio/2022/10/11/audio_45b0a6b02e.mp3"></audio>
+  <audio id="hitSound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_8cc2985e3c.mp3"></audio>
+  <audio id="bgMusic" src="https://files.catbox.moe/8u92n7.mp3"></audio> <!-- Türkçe rap müzik örneği -->
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const startScreen = document.getElementById("startScreen");
+    const highScoreDisplay = document.getElementById("highScoreDisplay");
+    const flapSound = document.getElementById("flapSound");
+    const hitSound = document.getElementById("hitSound");
+    const bgMusic = document.getElementById("bgMusic");
+
+    const bird = {
+      x: 50,
+      y: 200,
+      width: 30,
+      height: 30,
+      gravity: 0.6,
+      lift: -10,
+      velocity: 0
+    };
+
+    const pipes = [];
+    const clouds = [];
+    const trees = [];
+    let score = 0;
+    let highScore = localStorage.getItem("highScore") || 0;
+    let gameStarted = false;
+    let frame = 0;
+
+    highScoreDisplay.textContent = `En Yüksek Skor: ${highScore}`;
+
+    function drawBird() {
+      ctx.fillStyle = "yellow";
+      ctx.fillRect(bird.x, bird.y, bird.width, bird.height);
+    }
+
+    function drawPipes() {
+      ctx.fillStyle = "green";
+      pipes.forEach(pipe => {
+        ctx.fillRect(pipe.x, 0, pipe.width, pipe.top);
+        ctx.fillRect(pipe.x, pipe.top + pipe.gap, pipe.width, canvas.height);
+      });
+    }
+
+    function drawClouds() {
+      ctx.fillStyle = "white";
+      clouds.forEach(cloud => {
+        ctx.beginPath();
+        ctx.arc(cloud.x, cloud.y, 20, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+
+    function drawTrees() {
+      trees.forEach(tree => {
+        ctx.fillStyle = "#8B4513";
+        ctx.fillRect(tree.x + 5, canvas.height - 60, 10, 30);
+        ctx.fillStyle = "#228B22";
+        ctx.beginPath();
+        ctx.arc(tree.x + 10, canvas.height - 60, 20, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+
+    function drawScore() {
+      ctx.fillStyle = "white";
+      ctx.font = "24px Arial";
+      ctx.fillText(`Skor: ${score}`, 10, 30);
+    }
+
+    function resetGame() {
+      bird.y = 200;
+      bird.velocity = 0;
+      pipes.length = 0;
+      clouds.length = 0;
+      trees.length = 0;
+      score = 0;
+      frame = 0;
+    }
+
+    function startGame() {
+      resetGame();
+      gameStarted = true;
+      startScreen.style.display = "none";
+      bgMusic.volume = 0.5;
+      bgMusic.play().catch(e => console.warn("Müzik oynatılamadı:", e));
+      requestAnimationFrame(gameLoop);
+    }
+
+    function flap() {
+      if (gameStarted) {
+        bird.velocity = bird.lift;
+        flapSound.currentTime = 0;
+        flapSound.play();
+      }
+    }
+
+    function gameLoop() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (!gameStarted) return;
+
+      frame++;
+      bird.velocity += bird.gravity;
+      bird.y += bird.velocity;
+
+      if (frame % 90 === 0) {
+        const top = Math.random() * 200 + 20;
+        pipes.push({ x: canvas.width, width: 50, top, gap: 150 });
+      }
+
+      pipes.forEach(pipe => {
+        pipe.x -= 2;
+        if (
+          bird.x < pipe.x + pipe.width &&
+          bird.x + bird.width > pipe.x &&
+          (bird.y < pipe.top || bird.y > pipe.top + pipe.gap)
+        ) {
+          hitSound.play();
+          gameStarted = false;
+          if (score > highScore) {
+            highScore = score;
+            localStorage.setItem("highScore", highScore);
+            highScoreDisplay.textContent = `En Yüksek Skor: ${highScore}`;
+          }
+          startScreen.style.display = "flex";
+        }
+        if (pipe.x + pipe.width === bird.x) score++;
+      });
+
+      while (pipes.length > 0 && pipes[0].x + pipes[0].width < 0) {
+        pipes.shift();
+      }
+
+      if (frame % 100 === 0) {
+        clouds.push({ x: canvas.width, y: Math.random() * 100 });
+        trees.push({ x: canvas.width });
+      }
+
+      clouds.forEach(c => c.x -= 1);
+      trees.forEach(t => t.x -= 2);
+
+      drawClouds();
+      drawTrees();
+      drawPipes();
+      drawBird();
+      drawScore();
+
+      if (bird.y + bird.height > canvas.height) {
+        hitSound.play();
+        gameStarted = false;
+        if (score > highScore) {
+          highScore = score;
+          localStorage.setItem("highScore", highScore);
+          highScoreDisplay.textContent = `En Yüksek Skor: ${highScore}`;
+        }
+        startScreen.style.display = "flex";
+      }
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    document.addEventListener("click", () => {
+      if (!gameStarted) {
+        startGame();
+      }
+    });
+
+    canvas.addEventListener("click", flap);
+    document.addEventListener("keydown", (e) => {
+      if (e.code === "Space") {
+        e.preventDefault();
+        flap();
+      }
+    });
+  </script>
+</body>
+</html>
